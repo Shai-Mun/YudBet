@@ -61,7 +61,7 @@ class SQLClientGUI:
         tk.Button(nav_frame, text="Insert User", command=lambda: self.show_action_form("INSUSR"), width=10).grid(row=0, column=0, padx=3)
         tk.Button(nav_frame, text="Update User", command=lambda: self.show_action_form("UPDUSR"), width=10).grid(row=0, column=1, padx=3)
         tk.Button(nav_frame, text="Delete User", command=lambda: self.show_action_form("DELUSR"), width=10).grid(row=0, column=2, padx=3)
-        tk.Button(nav_frame, text="Get All Users", command=lambda: self.show_action_form("GETUSR"), width=10).grid(row=0, column=3, padx=3)
+        tk.Button(nav_frame, text="Get All Users", command=lambda: self.show_action_form("GETAUS"), width=10).grid(row=0, column=3, padx=3)
 
         # Dynamic Form Frame
         self.form_frame = tk.Frame(self.main_frame)
@@ -94,7 +94,7 @@ class SQLClientGUI:
             fields = ["Owner", "Apartment Password"]
             btn_text = "Submit Delete"
             cmd = self.execute_delete
-        elif action == "GETUSR":
+        elif action == "GETAUS":
             fields = []
             btn_text = "Fetch All Users"
             cmd = self.execute_get_users
@@ -129,11 +129,11 @@ class SQLClientGUI:
         self.send_and_receive(data)
 
     def execute_delete(self):
-        data = f"DELUSR|{self.current_entries['Owner'].get()}"
+        data = f"DELUSR|{self.current_entries['Owner'].get()}|{self.current_entries['Apartment Password'].get()}"
         self.send_and_receive(data)
 
     def execute_get_users(self):
-        self.send_and_receive("GETUSR")
+        self.send_and_receive("GETAUS")
 
     def open_register_window(self):
         reg_win = tk.Toplevel(self.root)

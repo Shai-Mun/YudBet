@@ -104,12 +104,27 @@ def do_action(data, db):
                 salt, stored_hash = user_record['salt'], user_record['password_hash']
                 attempt_hash = hashlib.sha256((salt + fields[1] + PEPPER).encode()).hexdigest()
 
-                if attempt_hash == stored_hash:
-                    print(db.del_user(fields[0]))
-            to_send = "DELUSRR|" + "c"
+                if attempt_hash == stored_hash and db.del_user(fields[0]):
+                    to_send = "DELUSRR|" + "Success"
+                else:
+                    to_send = "DELUSRR|" + "Error"
 
-        elif action == "GETUSR":
-            to_send = "GETUSRR|" + "d"
+        # for u in users:
+        #     print(u)
+
+        elif action == "GETAUS":
+            users = db.get_users()
+            if users is not None:
+                to_send = "GETAUSR|" + "Success" + "|\n"
+                for u in users:
+                    u = tuple(str(item) for item in u)
+                    to_send += "Name & pass: " + u[0] + ", " + u[1] + "\n"
+                    to_send += "Street, floor & apartment num: " + u[4] + ", " + u[5] + ", " + u[6] + "\n"
+                    to_send += "Gmail & phone num: " + u[7] + ", " + u[8] + "\n"
+                    to_send += "ID & admin status: " + u[9] + ", " + u[10] + "\n\n"
+            else:
+                to_send = "GETAUSR|" + "Error"
+
 
 
         elif action == "RULIVE":

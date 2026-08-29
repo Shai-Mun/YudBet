@@ -38,6 +38,7 @@ class Apartment(object):
                       self.floor+":"+self.num+ ":"+self.phone+ ":"+self.email+ ":"+ \
                       str(self.account_ID)+":"+self.isAdmin
 
+
 class Landlord(object):
     def __init__(self,acc_id,balance,manager,):
         self.id=acc_id
@@ -145,7 +146,8 @@ class UserAccountORM:
         self.open_db()
         try:
             sql = "DELETE FROM Users WHERE Username = ?"
-            res = self.current.execute(sql, (owner,)).fetchone()
+            res = self.current.execute(sql, (owner,))
+            self.commit()
             print(res)
             self.close_db()
             return True
@@ -170,9 +172,14 @@ class UserAccountORM:
 
     def get_users(self):
         self.open_db()
-        res = self.current.execute("SELECT * FROM Users").fetchall()
-        self.close_db()
-        return res
+        try:
+            res = self.current.execute("SELECT * FROM Users").fetchall()
+            self.close_db()
+            return res
+        except Exception as e:
+            self.close_db()
+            return None
+
 
     # def get_user_balance(self,username):
     #     self.open_db()
@@ -211,9 +218,20 @@ class UserAccountORM:
 
     def update_user(self,user):
         self.open_db()
-        """
-        Do here
-        """
+        try:
+            sql = "UPDATE Users SET Street = ?, Floor = ?, Num = ?, Email = ?, Phone = ? WHERE Username = ?"
+            res = self.current.execute(sql, (
+                user.street, user.floor, user.num, user.email, user.phone, user.owner
+            ))
+            self.commit()
+            print(res)
+            self.close_db()
+            return True
+
+        except Exception as e:
+            print("DB Insertion Error:", e)
+            self.close_db()
+            return False
         self.close_db()
         return True
 
