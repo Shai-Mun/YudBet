@@ -32,7 +32,6 @@ def handl_client(sock, tid, db):
             if not enc_data:
                 break
 
-            # Manual AES Decryption
             iv, ct = enc_data[:16], enc_data[16:]
             msg = enc_utils.aes_cbc_decrypt(ct, iv, encryption_key).decode()
 
@@ -51,7 +50,6 @@ def handl_client(sock, tid, db):
                             enc_utils.send_msg(sock, iv_resp + ct_resp)
                             continue
 
-                # Allow registration before login
                 elif msg.startswith("INSUSR|"):
                     to_send = do_action(msg, db)
                     ct_resp, iv_resp = enc_utils.aes_cbc_encrypt(to_send.encode(), encryption_key)
@@ -73,106 +71,127 @@ def handl_client(sock, tid, db):
 
 
 def do_action(data, db):
-    """
-    check what client ask and fill to send with the answer
-    """
+    """ניתוב 10 השירותים של המערכת"""
     to_send = "Not Set Yet"
     action = data[:6]
-    data = data[7:]
-    fields = data.split('|')
+    data_content = data[7:]
+    fields = data_content.split('|')
+
     try:
-        if action == "UPDUSR":
-            usr = SQL_ORM.Apartment(fields[0], fields[1], fields[2], fields[3], fields[4],
-                                    fields[5], fields[6], 0, False)
-            if db.update_user(usr):
-                to_send = "UPDUSRR|" + "Success"
-            else:
-                to_send = "UPDUSRR|" + "Error"
-
-        elif action == "INSUSR":
+        # 1. הוספת משתמש / הרשמה
+        if action == "INSUSR":
             user = SQL_ORM.Apartment(fields[0], fields[1], fields[2], fields[3], fields[4],
-                                     fields[5], fields[6], 0, False)
+                                     fields[5], fields[6], 1, False)
             if db.insert_new_account(user):
-                to_send = "INSUSRR|" + "Success"
+                to_send = "INSUSRR|Success"
             else:
-                to_send = "INSUSRR|" + "Error"
+                to_send = "INSUSRR|Error"
 
-        elif action == "DELUSR":
-            user_record = db.get_user_credentials(fields[0])
+        # 2. הוספת בניין
+        elif action == "INSBLD":
+            bldg = SQL_ORM.Building(None, fields[0], fields[1], fields[2], fields[3])
+            if db.insert_building(bldg):
+                to_send = "INSBLDR|Success"
+            else:
+                to_send = "INSBLDR|Error"
 
-            if user_record:
-                salt, stored_hash = user_record['salt'], user_record['password_hash']
-                attempt_hash = hashlib.sha256((salt + fields[1] + PEPPER).encode()).hexdigest()
+        # 3. הצגת כל הבניינים
+        elif action == "GETBLD":
+            bldgs = db.get_all_buildings()
+            if bldgs is not None:
+                to_send = "GETBLDR|Success|\n"
+                for b in bldgs:
+                    to_send += f"ID: {b[0]} | Address: {b[1]}, {b[2]} | Floors: {b[3]} | Elevator: {b[4]}\n"
+            else:
+                to_send = "GETBLDR|Error"
 
-                if attempt_hash == stored_hash and db.del_user(fields[0]):
-                    to_send = "DELUSRR|" + "Success"
-                else:
-                    to_send = "DELUSRR|" + "Error"
+        # 4. הוספת דירה
+        elif action == "INSAPT":
+            user = SQL_ORM.Apartment(fields[3], "123456", "Street", fields[2], fields[1],
+                                     "email@mail.com", "0500000000", fields[0], False)
+            if db.insert_new_account(user, building_id=fields[0]):
+                to_send = "INSAPTR|Success"
+            else:
+                to_send = "INSAPTR|Error"
 
-        # for u in users:
-        #     print(u)
+        # 5. חיפוש דירות לפי בניין (פגיע ל-SQL Injection)
+        elif action == "GETABI":
+            apts = db.get_apts_by_building_vulnerable(fields[0])
+            if apts is not None:
+                to_send = "GETABIR|Success|\n"
+                for a in apts:
+                    to_send += f"Resident: {a[0]} | Apt Num: {a[6]} | Floor: {a[5]}\n"
+            else:
+                to_send = "GETABIR|Error"
 
-        elif action == "GETAUS":
+        # 6. שאילתת אגרגציה - סך שכר דירה לבניין
+        elif action == "SUMRNT":
+            total = db.sum_rent_by_building(fields[0])
+            to_send = f"SUMRNTR|Success|Total Rent: {total}"
+
+        # 7. עדכון דירה
+        elif action == "UPDAPT":
+            user = SQL_ORM.Apartment(fields[0], "", "Street", fields[2], "1", "email@mail.com", fields[1], 1, False)
+            if db.update_user(user):
+                to_send = "UPDAPTR|Success"
+            else:
+                to_send = "UPDAPTR|Error"
+
+        # 8. מחיקת דירה
+        elif action == "DELAPT":
+            if db.del_user(fields[0]):
+                to_send = "DELAPTR|Success"
+            else:
+                to_send = "DELAPTR|Error"
+
+        # 9. הצגת כל הדירות
+        elif action == "GETAPT":
             users = db.get_users()
             if users is not None:
-                to_send = "GETAUSR|" + "Success" + "|\n"
+                to_send = "GETAPTR|Success|\n"
                 for u in users:
-                    u = tuple(str(item) for item in u)
-                    to_send += "Name & pass: " + u[0] + ", " + u[1] + "\n"
-                    to_send += "Street, floor & apartment num: " + u[4] + ", " + u[5] + ", " + u[6] + "\n"
-                    to_send += "Gmail & phone num: " + u[7] + ", " + u[8] + "\n"
-                    to_send += "ID & admin status: " + u[9] + ", " + u[10] + "\n\n"
+                    to_send += f"Resident: {u[0]} | BuildingID: {u[9]} | Floor: {u[5]} | Num: {u[6]}\n"
             else:
-                to_send = "GETAUSR|" + "Error"
+                to_send = "GETAPTR|Error"
 
-
-
+        # 10. בדיקת חיות שרת
         elif action == "RULIVE":
-            to_send = "RULIVER|" + "yes i am a live server"
+            to_send = "RULIVER|yes i am a live server"
 
         else:
-            print("Got unknown action from client " + action)
-            to_send = "ERR___R|001|" + "unknown action"
+            to_send = "ERR___R|001|unknown action"
 
     except Exception as e:
         print("Error:", e)
-        to_send = "ERR___R|002|" + "error"
+        to_send = "ERR___R|002|error"
 
     return to_send
 
 
 def q_manager(q, tid):
     global exit_all
-
-    print("manager start:" + str(tid))
     while not exit_all:
         item = q.get()
-        print("manager got somthing:" + str(item))
-        # do some work with it(item)
-
         q.task_done()
         time.sleep(0.3)
-    print("Manager say Bye")
 
 
 def main():
     global exit_all
-
     exit_all = False
-    db = SQL_ORM.UserAccountORM()
+
+    db = SQL_ORM.BuildingApartmentORM()
 
     s = socket.socket()
-
     q = Queue()
-
     q.put("Hi for start")
 
     manager = threading.Thread(target=q_manager, args=(q, 0))
+    manager.start()
 
     s.bind(("0.0.0.0", 33445))
-
     s.listen(4)
-    print("after listen")
+    print("Server active on port 33445...")
 
     threads = []
     i = 1
@@ -183,12 +202,6 @@ def main():
         i += 1
         threads.append(t)
 
-    exit_all = True
-    for t in threads:
-        t.join()
-    manager.join()
 
-    s.close()
-
-
-main()
+if __name__ == "__main__":
+    main()

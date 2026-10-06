@@ -7,13 +7,12 @@ import enc_utils
 class SQLClientGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("SQL Client GUI - Secured")
-        self.root.geometry("480x550")
+        self.root.title("Building & Apartment Management GUI")
+        self.root.geometry("560x640")
 
         self.encryption_key = ""
         self.cli_s = socket.socket()
 
-        # Connect and exchange keys
         try:
             self.cli_s.connect(("127.0.0.1", 33445))
             self.encryption_key = enc_utils.dph_cli(self.cli_s)
@@ -22,7 +21,6 @@ class SQLClientGUI:
             self.root.after(10, self.root.destroy)
             return
 
-        # Bind closing handler ONLY if connection succeeds
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         self.build_login_frame()
@@ -54,110 +52,135 @@ class SQLClientGUI:
     def build_main_frame(self):
         self.main_frame = tk.Frame(self.root)
 
-        # Top Action Buttons Navigation Frame
         nav_frame = tk.Frame(self.main_frame)
         nav_frame.grid(row=0, column=0, columnspan=2, pady=10)
 
-        tk.Button(nav_frame, text="Insert User", command=lambda: self.show_action_form("INSUSR"), width=10).grid(row=0, column=0, padx=3)
-        tk.Button(nav_frame, text="Update User", command=lambda: self.show_action_form("UPDUSR"), width=10).grid(row=0, column=1, padx=3)
-        tk.Button(nav_frame, text="Delete User", command=lambda: self.show_action_form("DELUSR"), width=10).grid(row=0, column=2, padx=3)
-        tk.Button(nav_frame, text="Get All Users", command=lambda: self.show_action_form("GETAUS"), width=10).grid(row=0, column=3, padx=3)
+        # כפתורי פעולות בניינים ודירות בלבד (תואמי 10 השירותים)
+        tk.Button(nav_frame, text="הוסף בניין", command=lambda: self.show_action_form("INSBLD"), width=12).grid(row=0, column=0, padx=2, pady=2)
+        tk.Button(nav_frame, text="הצג בניינים", command=lambda: self.show_action_form("GETBLD"), width=12).grid(row=0, column=1, padx=2, pady=2)
+        tk.Button(nav_frame, text="חישוב הכנסה", command=lambda: self.show_action_form("SUMRNT"), width=12).grid(row=0, column=2, padx=2, pady=2)
 
-        # Dynamic Form Frame
+        tk.Button(nav_frame, text="הוסף דירה", command=lambda: self.show_action_form("INSAPT"), width=12).grid(row=1, column=0, padx=2, pady=2)
+        tk.Button(nav_frame, text="חיפוש לפי בניין", command=lambda: self.show_action_form("GETABI"), width=12).grid(row=1, column=1, padx=2, pady=2)
+        tk.Button(nav_frame, text="עדכן דירה", command=lambda: self.show_action_form("UPDAPT"), width=12).grid(row=1, column=2, padx=2, pady=2)
+
+        tk.Button(nav_frame, text="מחק דירה", command=lambda: self.show_action_form("DELAPT"), width=12).grid(row=2, column=0, padx=2, pady=2)
+        tk.Button(nav_frame, text="הצג כל הדירות", command=lambda: self.show_action_form("GETAPT"), width=12).grid(row=2, column=1, padx=2, pady=2)
+
         self.form_frame = tk.Frame(self.main_frame)
         self.form_frame.grid(row=1, column=0, columnspan=2, pady=10)
 
-        # Server Response Console
         tk.Label(self.main_frame, text="Server Response:").grid(row=2, column=0, columnspan=2, sticky="w", padx=10)
-        self.console = tk.Text(self.main_frame, height=10, width=54, state="disabled")
+        self.console = tk.Text(self.main_frame, height=12, width=64, state="disabled")
         self.console.grid(row=3, column=0, columnspan=2, padx=10, pady=5)
 
-        # Initialize with Insert form by default
-        self.show_action_form("INSUSR")
+        self.show_action_form("INSBLD")
 
     def show_action_form(self, action):
-        """Rebuilds the form area dynamically based on the selected action."""
         for widget in self.form_frame.winfo_children():
             widget.destroy()
 
         self.current_entries = {}
+        fields = []
+        btn_text = ""
+        cmd = None
 
-        if action == "INSUSR":
-            fields = ["Owner", "Apartment Password", "Street num", "Floor num", "Apartment num", "Email", "Phone"]
-            btn_text = "Submit Insert"
-            cmd = self.execute_insert
-        elif action == "UPDUSR":
-            fields = ["Owner", "Apartment Password", "Street num", "Floor num", "Apartment num", "Email", "Phone"]
+        if action == "INSBLD":
+            fields = ["Address", "City", "Num Floors", "Has Elevator"]
+            btn_text = "Submit Building"
+            cmd = self.execute_insert_building
+        elif action == "GETBLD":
+            btn_text = "Fetch All Buildings"
+            cmd = lambda: self.send_and_receive("GETBLD")
+        elif action == "SUMRNT":
+            fields = ["Building ID"]
+            btn_text = "Calculate Total Rent"
+            cmd = self.execute_sum_rent
+        elif action == "INSAPT":
+            fields = ["Building ID", "Apartment Num", "Floor", "Resident Name"]
+            btn_text = "Submit Apartment"
+            cmd = self.execute_insert_apartment
+        elif action == "GETABI":
+            fields = ["Building ID"]
+            btn_text = "Fetch Apartments in Building"
+            cmd = self.execute_get_apts_by_bldg
+        elif action == "UPDAPT":
+            fields = ["Resident Name", "Phone", "Floor"]
             btn_text = "Submit Update"
-            cmd = self.execute_update
-        elif action == "DELUSR":
-            fields = ["Owner", "Apartment Password"]
+            cmd = self.execute_update_apartment
+        elif action == "DELAPT":
+            fields = ["Resident Name"]
             btn_text = "Submit Delete"
-            cmd = self.execute_delete
-        elif action == "GETAUS":
-            fields = []
-            btn_text = "Fetch All Users"
-            cmd = self.execute_get_users
+            cmd = self.execute_delete_apartment
+        elif action == "GETAPT":
+            btn_text = "Fetch All Apartments"
+            cmd = lambda: self.send_and_receive("GETAPT")
 
         for idx, field in enumerate(fields):
-            tk.Label(self.form_frame, text=field + ":").grid(row=idx, column=0, padx=5, pady=4, sticky="e")
-            entry = tk.Entry(self.form_frame, width=28)
-            if "Password" in field:
-                entry.config(show="*")
-            entry.grid(row=idx, column=1, padx=5, pady=4)
+            tk.Label(self.form_frame, text=field + ":").grid(row=idx, column=0, padx=5, pady=3, sticky="e")
+            entry = tk.Entry(self.form_frame, width=30)
+            entry.grid(row=idx, column=1, padx=5, pady=3)
             self.current_entries[field] = entry
 
         row_idx = len(fields)
-        tk.Button(self.form_frame, text=btn_text, command=cmd, width=16).grid(row=row_idx, column=0, columnspan=2, pady=10)
+        tk.Button(self.form_frame, text=btn_text, command=cmd, width=22).grid(row=row_idx, column=0, columnspan=2, pady=8)
 
-    def execute_insert(self):
-        data = (
-            f"INSUSR|{self.current_entries['Owner'].get()}|{self.current_entries['Apartment Password'].get()}|"
-            f"{self.current_entries['Street num'].get()}|{self.current_entries['Floor num'].get()}|"
-            f"{self.current_entries['Apartment num'].get()}|{self.current_entries['Email'].get()}|"
-            f"{self.current_entries['Phone'].get()}"
-        )
+    def execute_insert_building(self):
+        data = f"INSBLD|{self.current_entries['Address'].get()}|{self.current_entries['City'].get()}|{self.current_entries['Num Floors'].get()}|{self.current_entries['Has Elevator'].get()}"
         self.send_and_receive(data)
 
-    def execute_update(self):
-        data = (
-            f"UPDUSR|{self.current_entries['Owner'].get()}|{self.current_entries['Apartment Password'].get()}|"
-            f"{self.current_entries['Street num'].get()}|{self.current_entries['Floor num'].get()}|"
-            f"{self.current_entries['Apartment num'].get()}|{self.current_entries['Email'].get()}|"
-            f"{self.current_entries['Phone'].get()}"
-        )
+    def execute_sum_rent(self):
+        data = f"SUMRNT|{self.current_entries['Building ID'].get()}"
         self.send_and_receive(data)
 
-    def execute_delete(self):
-        data = f"DELUSR|{self.current_entries['Owner'].get()}|{self.current_entries['Apartment Password'].get()}"
+    def execute_insert_apartment(self):
+        data = f"INSAPT|{self.current_entries['Building ID'].get()}|{self.current_entries['Apartment Num'].get()}|{self.current_entries['Floor'].get()}|{self.current_entries['Resident Name'].get()}"
         self.send_and_receive(data)
 
-    def execute_get_users(self):
-        self.send_and_receive("GETAUS")
+    def execute_get_apts_by_bldg(self):
+        data = f"GETABI|{self.current_entries['Building ID'].get()}"
+        self.send_and_receive(data)
+
+    def execute_update_apartment(self):
+        data = f"UPDAPT|{self.current_entries['Resident Name'].get()}|{self.current_entries['Phone'].get()}|{self.current_entries['Floor'].get()}"
+        self.send_and_receive(data)
+
+    def execute_delete_apartment(self):
+        data = f"DELAPT|{self.current_entries['Resident Name'].get()}"
+        self.send_and_receive(data)
 
     def open_register_window(self):
         reg_win = tk.Toplevel(self.root)
         reg_win.title("Register New User")
-        reg_win.geometry("350x350")
+        reg_win.geometry("360x360")
 
         reg_entries = {}
         fields = ["Owner", "Apartment Password", "Street num", "Floor num", "Apartment num", "Email", "Phone"]
 
         for idx, field in enumerate(fields):
             tk.Label(reg_win, text=field + ":").grid(row=idx, column=0, padx=10, pady=5, sticky="e")
-            entry = tk.Entry(reg_win, width=30)
+            entry = tk.Entry(reg_win, width=28)
             if "Password" in field:
                 entry.config(show="*")
             entry.grid(row=idx, column=1, padx=10, pady=5)
             reg_entries[field] = entry
 
         def submit_registration():
-            data = (
-                f"INSUSR|{reg_entries['Owner'].get()}|{reg_entries['Apartment Password'].get()}|"
-                f"{reg_entries['Street num'].get()}|{reg_entries['Floor num'].get()}|"
-                f"{reg_entries['Apartment num'].get()}|{reg_entries['Email'].get()}|"
-                f"{reg_entries['Phone'].get()}"
-            )
+            # Sanitize inputs: strip whitespace and remove '|' to prevent server protocol errors
+            owner = reg_entries['Owner'].get().strip().replace("|", "")
+            pwd = reg_entries['Apartment Password'].get().replace("|", "")
+            street = reg_entries['Street num'].get().strip().replace("|", "")
+            floor = reg_entries['Floor num'].get().strip().replace("|", "")
+            apt = reg_entries['Apartment num'].get().strip().replace("|", "")
+            email = reg_entries['Email'].get().strip().replace("|", "")
+            phone = reg_entries['Phone'].get().strip().replace("|", "")
+
+            # Validation check for required fields
+            if not owner or not pwd:
+                messagebox.showwarning("Input Error", "Username and Password cannot be empty!", parent=reg_win)
+                return
+
+            data = f"INSUSR|{owner}|{pwd}|{street}|{floor}|{apt}|{email}|{phone}"
 
             try:
                 ct, iv = enc_utils.aes_cbc_encrypt(data.encode(), self.encryption_key)
@@ -184,16 +207,12 @@ class SQLClientGUI:
         pwd = self.login_pass.get()
 
         plaintext_msg = f"LOGIN|{user}|{pwd}"
-        print(f"Client Sending (Plaintext): {plaintext_msg}")
-
         ct, iv = enc_utils.aes_cbc_encrypt(plaintext_msg.encode(), self.encryption_key)
         enc_utils.send_msg(self.cli_s, iv + ct)
 
         resp_enc = enc_utils.recv_msg(self.cli_s)
         iv_resp, ct_resp = resp_enc[:16], resp_enc[16:]
         resp = enc_utils.aes_cbc_decrypt(ct_resp, iv_resp, self.encryption_key).decode()
-
-        print(f"Client Received (Plaintext): {resp}")
 
         if resp == "LOGIN_OK":
             self.login_frame.pack_forget()
