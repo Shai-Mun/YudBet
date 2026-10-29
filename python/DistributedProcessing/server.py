@@ -31,14 +31,11 @@ class HandleClient(threading.Thread):
         data = recv_by_size(self.sock).decode()
         fields = data.split("~")
         if fields[0] == "READY":
-            to_send = "START~" + str(CHUNK_SIZE) + "~"
+            to_send = "START~" + str(CHUNK_SIZE) + "~" + self.str_to_find + "~"
             self.get_tasks()
             for t in self.tasks:
                 to_send += str(t) + "~"
 
-            print(TASKS)
-            print(TASKS_CURRENT)
-            print(TASKS_DONE)
             send_with_size(self.sock, to_send.encode())
 
     def get_tasks(self):
