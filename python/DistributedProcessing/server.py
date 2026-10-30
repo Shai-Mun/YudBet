@@ -71,6 +71,8 @@ def main(str_to_find):
         i += 1
         threads.append(t)
 
+    for t in threads:
+        t.join()
 
 if __name__ == '__main__':
     if len(sys.argv) == 2:

@@ -1,6 +1,7 @@
 __author__ = 'Yossi'
 
 import hashlib
+import multiprocessing
 # 2.6  client server October 2021
 
 import socket
@@ -32,12 +33,11 @@ def handle_reply(data):
 def find_str(task_num):
     global STR_TO_FIND
     for i in range(task_num*CHUNK_SIZE, task_num*CHUNK_SIZE+CHUNK_SIZE):
-        print(i)
         md5_object = hashlib.md5(str(i).zfill(10).encode('utf-8'))
         hex_hash = md5_object.hexdigest()
         if hex_hash == STR_TO_FIND:
-            return True
-    return False
+            return i
+    return -1
 
 
 def main(ip):
@@ -50,7 +50,7 @@ def main(ip):
     connected = False
     sock = socket.socket()
     port = 33445
-    sock.settimeout(0.0)
+    sock.settimeout(0.1)
 
     try:
         sock.connect((ip, port))
@@ -59,7 +59,7 @@ def main(ip):
     except:
         print(f'Error while trying to connect.  Check ip or port -- {ip}:{port}')
 
-    threads = []
+    processes = []
     send_with_size(sock, "READY~".encode())
     while connected:
         try:
@@ -68,7 +68,7 @@ def main(ip):
                 print('Seems server disconnected abnormal')
                 break
             else:
-                pass
+                handle_reply(byte_data.decode())
                 # print(byte_data.decode())
         except TimeoutError:
             continue
@@ -81,14 +81,18 @@ def main(ip):
             break
 
         if len(TASKS_TO_DO) > 0:
-            t = threading.Thread(target=find_str, args=(TASKS_TO_DO[0]))
+            print(TASKS_TO_DO[0])
+            TASKS_DOING.clear()
+            p = multiprocessing.Process(target=find_str, args=(int(TASKS_TO_DO[0]), ))
             TASKS_DOING.append(TASKS_TO_DO.pop(0))
-            t.start()
-            threads.append(t)
+            p.start()
+            processes.append(p)
 
 
-    print ('Bye')
+    for p in processes:
+        p.join()
     sock.close()
+    print ('Bye')
 
 
 if __name__ == '__main__':
