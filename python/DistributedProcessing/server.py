@@ -89,6 +89,7 @@ class HandleClient(threading.Thread):
         global TASKS_DONE
         self.tasks = []
 
+        # test
         # n = 12
         # self.tasks.append(n)
         # TASKS.remove(n)
